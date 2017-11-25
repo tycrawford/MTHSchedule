@@ -20,4 +20,6 @@ class Employee(db.model):
 class Request(db.model):
     id = db.Column(db.Integer, primary_key=True)
     employeeID = db.Column(db.Integer)
-    
+    month = db.Column(db.Integer)
+    year = db.Column(db.Integer)
+    request = db.Column(db.String(500)) #String in the form of a list of days DNo/Can/Yes, 9, 9DNo/Can/Yes

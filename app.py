@@ -7,3 +7,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mthschedule:mthschedule
 app.config['SQLALCHEMY_ECHO'] = True
 app.secret_key = 'whodunnit'
 db = SQLAlchemy(app)
+
+
+
+
+
+if __name__ == "__main__":
+    app.run()
