@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>New User Signup</h2>
+Please enter a username between 3 and 20 characters long
+<form action="/signup" method='post'>
+    <table>
+        <tr>
+            <td>
+                <label> Username </label>
+
+            </td>
+            <td>
+                <input type="text" name="username">
+
+            </td>
+            <td>
+                {{usernameError}}
+            </td>
+        </tr>
+        <tr>
+                <td>
+                    <label> EmployeeName </label>
+    
+                </td>
+                <td>
+                    <input type="text" name="name">
+    
+                </td>
+                <td>
+                </td>
+            </tr>
+            
+
+        <tr>
+            <td>
+                <label>
+                    Password
+
+                </label>
+            </td>
+            <td>
+                <input type="password" name="password">
+
+            </td>
+            <td>
+                {{passwordError}}
+
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label>
+                    Confirm Password
+                </label>
+            </td>
+            <td>
+                <input type="password" name="confirm" />
+            </td>
+        </tr>
+    </table>
+    <input type="submit" name="submit">
+</form>
+<p>
+    Already a user? <a href="/login"> Log in! </a>
+</p>
+{% endblock %}
