@@ -1,3 +1,17 @@
 11/28/2017
 -Rebuilt database
 -Successfully built a user and tied it to an employee
+
+11/30/2017
+-Successfully built an HTML calendar from query parameters
+-Each day on the calendar has a date, request, and time in and out
+-Also spent time working on Testrequestday and Testemployee
+-The HTML Calendar form now works and generates loads of form data.
+-Need to print Lists to make sure they work
+-Maybe make a new template just to showcase that requests do work. 
+
+12/7/2017
+-Successfully posted the form from the HTML calendar to a function
+-Built a page that shows a month's worth of requests
+-Successfully built a user
+-Successfully built a month of requests for a user. 

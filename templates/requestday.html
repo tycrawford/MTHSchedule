@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h2> Request a Day off </h2>
+    {{employee}}<br>
+    {{month}} {{day}}, {{year}}<br>
+<form action="/requestday" method="POST" id="request">
+    <input type="hidden" name="month" value={{month}}>
+    <input type="hidden" name="year" value={{year}}>
+    <input type="hidden" name="day" value={{day}}>
+    <input type="hidden" name="employee" value={{employee}}>    
+    <label>Request</label>
+        <select name="choice" form="request">
+            {{ selectChoice | safe}}
+        </select>
+    <label>Start</label>
+        <select name="start" form="request">
+            {{selectStart | safe}}                           
+        </select>
+    <label>End</label>
+        <select name="end" form="request">
+            {{selectEnd | safe}}
+        </select>
+    <input type="submit">
+</form>                        
+{% endblock %}
