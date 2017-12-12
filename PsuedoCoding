@@ -1,0 +1,22 @@
+Making a calendar of shifts:
+    -Easiest way would likely be to give the administrator a way to make one week's worth of shifts, and stretch them across the whole month. 
+    -Maybe call this something like "Make a schedule from a one-week template"
+    -Perhaps recall the previous month's template, allowing a more evolution-based model
+    -Alternatively, make it a two step project:
+        -Start by deciding outright how many shifts to add to each day.
+        -This generates a new form, with the correct number of shifts in each day, still requiring role, times, etc.
+        -Submitting this form creates all of the shift objects.
+        
+Build a shift class:
+    -Gets built at the generation of the calendar.
+    -Each shift has a day, role, time, and eventually an employee.
+    -Consider alluding to objects, which would give functionality to the properties in those classes
+    -Also consider entering strings or integers into the database so as to preserve data in the longterm.
+        -For example, suppose we fire an employee and delete their file, it would still be nice to have a record of the shifts that employee worked.
+        -Similarly, if an employee changes roles, it would be ideal to have the role they worked in that shift preserved. 
+    
+
+Future changes to the employee class:
+    -Need to add an active/inactive boolean property. Inactive employees no longer work for the company or are otherwise incapable of being scheduled.
+    -Active employees will be pooled any time we need a drop down to change a shift
+    -Also need to add a role property, allowing employees to only be put into shifts they are capable of working.
