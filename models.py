@@ -13,6 +13,32 @@ import random
 #     def __init__(self, username, password):
 #         self.username = username
 #
+class Shift():
+    id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Integer)
+    month = db.Column(db.Integer)
+    year = db.Column(db.Integer)
+    role = db.Column(db.String(3))
+    timeIn = db.Column(db.String(5))
+    timeOut = db.Column(db.String(5))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def __init__(self, day, month, year, role, timeIn, timeOut):
+        self.day = day
+        self.month = month
+        self.year = year
+        self.role = role
+        self.timeIn = timeIn
+        self.timeOut = timeOut
+
+    def assignShift(self, user_id):
+        self.user_id = user_id
+
+    def checkTardy(self, clockIn):
+        clockInTime = float(clockIn.split(":")[0] + "." + str(float(clockIn.split(":")[1])/60))
+        timeInTime = float(self.timeIn.split(":")[0] + "." + str(float(self.timeIn.split(":")[1])/60))
+        difference = clockIn - self.timeIn
+        #TODO work on returning a number of minutes person was late or early
 
 class Testrequestday(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -39,8 +65,9 @@ class User(db.Model):
     username = db.Column(db.String(20), unique=True)
     pwHash = db.Column(db.String(120))
     employeeName = db.Column(db.String(50))
-    testRequestDays = db.relationship('Testrequestday', backref='userID')
-    
+    testRequestDays = db.relationship('Testrequestday', backref='user_id')
+    shifts = db.relationship('Shift', backref='user_id')
+
     def __init__(self, username, password, employeeName):
         newID = (User.query.order_by(User.id.desc()).first())
         if newID == None:
