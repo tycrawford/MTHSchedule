@@ -8,7 +8,7 @@ from calendar import monthrange
 from monthBuilding import makeCalendarHTML
 from hashutils import checkPwHash
 from makeChoiceList import makeChoiceList
-
+from makeShiftFromTemplate import makeWeekTemplateFromScratchPhaseOne, modifyWeekOfShifts
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'signup', 'month']
@@ -93,6 +93,17 @@ def signup():
         return render_template("usersignup.html")
 #This section is where I intend to prototype small features as I make things more and more functional until I get to the scale I want to achieve
 
+@app.route('/weekOfShifts', methods=['GET', 'POST'])
+def weekOfShifts():
+    if request.method == 'POST':
+        listOfShifts = []
+        for i in range(7):
+            listOfShifts.append(request.form[i])
+        table = modifyWeekOfShifts(listOfShifts)
+        return render_template("month.html", table=table)
+    if request.method == 'GET':
+        table = makeWeekTemplateFromScratchPhaseOne()
+        return render_template("month.html", table=table)
 
 @app.route("/testrequestday", methods=['GET', 'POST'])
 def testrequestday():
