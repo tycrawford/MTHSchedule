@@ -2,13 +2,15 @@ from flask import Flask
 from flask import request, redirect, render_template, session, flash
 import cgi
 from app import app, db
-from models import User, Testrequestday
+from models import User, Testrequestday, Shift
 import datetime
 from calendar import monthrange
-from monthBuilding import makeCalendarHTML
+from monthBuilding import makeCalendarHTML, makeCalendarList
 from hashutils import checkPwHash
 from makeChoiceList import makeChoiceList
-from makeShiftFromTemplate import makeWeekTemplateFromScratchPhaseOne, modifyWeekOfShifts
+from makeShiftFromTemplate import makeWeekTemplateFromScratchPhaseOne, modifyWeekOfShifts, makeWholeMonthShifts
+
+
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'signup', 'month']
@@ -26,13 +28,47 @@ def index():
     #TODO Give admins the option to generate the schedule
     #TODO Give admins the option to publish the schedule
     #TODO GIve admins the option to add a month for requests.
-    options = "Your Request Off Form <br> View Schedule <br>"
+    options = """<option value="viewrequest">Submit Request Off</option>
+    <option value="viewschedule">View Schedule</option>
+    """
     userInfo = User.query.filter_by(username=username).first()
     priv = userInfo.admin
     if priv == 1:
-        options = options + "View/Edit Shifts <br> Generate a Schedule <br> Publish a Schedule <br> Add A Schedule <br>"
+        options = options + """
+        <option value="makefreshmonth">Make a Schedule from a Template</option>
+        <option value="editschedule">Edit a Schedule</option>
+        <option value="viewshifts">View My Shifts</option>
+        """
+    selectList = """<form action='/homepagererouter' method='post'>
+    <label> Pick your option </label>
+    <select name="option">{0}</select><br>
+    <label> Month </label>
+    <input name='month' type='number' min='1' max='12'>
+    <label> Year </label>
+    <input name='year' type='number' min='2017' max='2025'>
+    <br>
+    <input type='submit' value='GO!'>
+    </form>
+    """.format(options)
 
-    return render_template('homepage.html', options=options)
+    return render_template('homepage.html', options=selectList)
+
+@app.route("/homepagererouter", methods=['POST'])
+def homepagererouter():
+    year = request.form['year']
+    month = request.form['month']
+    option = request.form['option']
+    if option == "viewrequest":
+        return redirect("/month?year={0}&month={1}".format(year,month))
+    elif option == "viewschedule":
+        return redirect("/viewmonth?year={0}&month={1}".format(year,month))
+    elif option == "editschedule":
+        return redirect("/editmonth?year={0}&month={1}".format(year,month))
+    elif option == "makefreshmonth":
+        return redirect("/weekOfShifts")
+    elif option == "viewshifts":
+        return redirect("/shifts?year={0}&month={1}".format(year,month))
+
 @app.route('/myrequests')
 def myRequests():
     username = session['username']
@@ -48,19 +84,53 @@ def monthselect():
 
 @app.route('/shifts')
 def shifts():
-    username = session['username']
-    userInfo = User.query.filter_by(username=username).first()
-    if userInfo.admin == 0:
-            return redirect("login")
-    #TODO add a month select
-    #
-    table = ""
+    times = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM', '7PM', '8PM', '9PM', '10PM']
 
+    username = session['username']
+    year = request.args.get('year')
+    month = request.args.get('month')
+    userInfo = User.query.filter_by(username=username).first()
+    shifts = Shift.query.filter_by(year=year, month=month,userId=userInfo.id).all()
+    table = """
+    <table border='1px'> <tr> <th>Day</th><th>Time In</th><th>Time Out</th></tr>
+
+    """
+    for shift in shifts:
+        table = table + """
+        <tr> <td> {1}/{2}/{0} </td> <td> {3} </td> <td> {4} </td> </tr>
+        """.format(year, month,shift.day,times[shift.timeIn-8], times[shift.timeOut-8])
+    table = table + "</table>"
     return render_template("month.html", table=table)
 
-@app.route('/login')
+
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    return render_template('login.html')
+    if request.method == 'GET':
+        return render_template('login.html')
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        usernameError = ''
+        passwordError = ''
+        existingUser = User.query.filter_by(username=username).first()
+        if not existingUser:
+            userError = "Username not in the system"
+            return render_template("login.html", usernameError=usernameError, passwordError=passwordError)
+        else:
+            if checkPwHash(password, existingUser.pwHash) == False:
+                print("PASSWORD FAILED #####################################")
+
+                passwordError = "Password not valid!"
+                return render_template("login.html", usernameError=usernameError, passwordError=passwordError)
+            else:
+                session['username'] = username
+                return redirect("/")
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -98,12 +168,54 @@ def weekOfShifts():
     if request.method == 'POST':
         listOfShifts = []
         for i in range(7):
-            listOfShifts.append(request.form[i])
+            listOfShifts.append(int(request.form[str(i)]))
         table = modifyWeekOfShifts(listOfShifts)
         return render_template("month.html", table=table)
+
     if request.method == 'GET':
         table = makeWeekTemplateFromScratchPhaseOne()
         return render_template("month.html", table=table)
+
+@app.route('/makewholemonth', methods=['POST'])
+def makewholemonth():
+    listOfShifts = []
+    for i in range(7):
+        listOfShifts.append(int(request.form[str(i)]))
+    template = []
+    days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    for i in range(len(listOfShifts)):
+        thisDaysShifts = []
+        for j in range(listOfShifts[i]):
+            thisShift = []
+            thisShiftRole = request.form[str(days[i]+"role"+str(j))]
+            thisShiftStart = request.form[str(days[i]+"start"+str(j))]
+            thisShiftEnd = request.form[str(days[i]+"end"+str(j))]
+            thisShift.append(thisShiftRole)
+            thisShift.append(thisShiftStart)
+            thisShift.append(thisShiftEnd)      #Add the List of Role, Start, and End to a small list
+            thisDaysShifts.append(thisShift)    #Add that small list to a list of all shifts for the day
+        template.append(thisDaysShifts)         #Add the day's worth of shifts to the template
+    year = request.form['year']
+    month = request.form['month']
+    listOfDays = makeCalendarList(int(year), int(month))
+    roles = ['M', 'MA', 'A', 'C', 'R']
+    for rowOfDays in listOfDays:
+        for i in range(len(rowOfDays)): #i represents the numerical equivalent of the day
+            if rowOfDays[i] == "":
+                continue
+            else:
+                for j in range(listOfShifts[i]): #j represents each shift of each day, listOfShifts has each days number of shifts indexed
+                    todayRole = roles.index(template[i][j][0])
+                    todayStart = template[i][j][1]
+                    todayEnd = template[i][j][2]
+                    day = rowOfDays[i]
+                    newShift = Shift(day,month,year,todayRole,todayStart,todayEnd)
+                    db.session.add(newShift)
+                    db.session.commit()
+
+    table = makeWholeMonthShifts(template, int(year), int(month))
+    return render_template("month.html", table=table)
+
 
 @app.route("/testrequestday", methods=['GET', 'POST'])
 def testrequestday():
@@ -195,5 +307,246 @@ def month():
 
         return(outputHTML)
 
+@app.route("/viewmonth")
+def viewmonth():
+    year = int(request.args.get('year'))
+    month = int(request.args.get('month'))
+    shifts = Shift.query.filter_by(year=year, month=month).order_by(Shift.day.asc(),Shift.timeIn.asc()).all()
+    startTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM']
+    endTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM', '7PM', '8PM', '9PM', '10PM']
+    roles = ['M', 'MA', 'A', 'C', 'R']
+    listForm = makeCalendarList(year, month)
+    monthName = datetime.date(1900, month, 1).strftime('%B')
+    htmlTable = """
+    <h1 align="center">{0} {1} </h1>
+    <br>
+    <table width='100%' border='1px'> 
+    <tr> 
+    <th> Sunday </th> 
+    <th> Monday </th> 
+    <th> Tuesday </th> 
+    <th> Wednesday </th> 
+    <th> Thursday </th> 
+    <th> Friday </th> 
+    <th> Saturday </th> 
+    </tr>""".format(monthName,str(year), str(month))
+    for row in listForm:
+        htmlTable += "<tr>"
+        for i in range(len(row)):
+            day = row[i]
+            if day == "":
+                htmlTable += "<td></td>"
+            else:
+                tableRows = ""
+                for shift in shifts:
+                    employee = User.query.filter_by(id=shift.userId).first()
+                    if employee == None:
+                        employeeName = "None"
+                    else:
+                        employeeName = employee.employeeName
+                    if shift.day == day:
+                        tableRows = tableRows + "<tr><td>" + roles[shift.role] + "</td><td>" + str(employeeName) + "</td><td>" + startTimes[shift.timeIn - 8] + "</td><td>" + endTimes[shift.timeOut - 8] + "</td></tr>"
+                    
+                htmlTable += """<td valign='top'>
+                <day style='float: right'>{0}</day>
+                <table border='1px' border-collapse='collapse'>
+                <tr>
+                <th>Role</th>
+                <th>Employee</th>
+                <th>Beg</th>
+                <th>End</th>
+                </tr>{1}</table></td>
+
+                """.format(day,tableRows)
+        htmlTable += "</tr>"
+    htmlTable += "</table>"
+    
+    return htmlTable
+    
+@app.route("/editmonth")
+def editmonth():
+    year = int(request.args.get('year'))
+    month = int(request.args.get('month'))
+    shifts = Shift.query.filter_by(year=year, month=month).order_by(Shift.day.asc(),Shift.timeIn.asc()).all()
+    startTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM']
+    endTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM', '7PM', '8PM', '9PM', '10PM']
+    roles = ['M', 'MA', 'A', 'C', 'R']
+    listForm = makeCalendarList(year, month)
+    monthName = datetime.date(1900, month, 1).strftime('%B')
+    htmlTable = """<form action='/assignshifts' method='post'>
+    <input type='hidden' name='month' value='{2}'>
+    <input type='hidden' name='year' value='{1}'>:
+    <h1 align="center">{0} {1} </h1>
+    <br>
+    <table width='100%' border='1px'> 
+    <tr> 
+    <th> Sunday </th> 
+    <th> Monday </th> 
+    <th> Tuesday </th> 
+    <th> Wednesday </th> 
+    <th> Thursday </th> 
+    <th> Friday </th> 
+    <th> Saturday </th> 
+    </tr>""".format(monthName,str(year), str(month))
+    for row in listForm:
+        htmlTable += "<tr>"
+        for i in range(len(row)):
+            day = row[i]
+            if day == "":
+                htmlTable += "<td></td>"
+            else:
+                tableRows = ""
+                for shift in shifts:
+                    employee = User.query.filter_by(id=shift.userId).first()
+                    if employee == None:
+                        employeeName = "None"
+                    else:
+                        employeeName = employee.employeeName
+                    listOfEmployees = []
+                    optionList = ""
+                    if roles[shift.role] == "M":
+                        employees = User.query.filter_by(role=0).all()
+                    elif roles[shift.role] == "MA":
+                        employees = User.query.filter_by(role='0').all()
+                        extraEmployees = User.query.filter_by(role='2').all()
+
+                    elif roles[shift.role] == "A":
+                        employees = User.query.filter_by(role=2).all()
+                    elif roles[shift.role] == "C":
+                        employees = User.query.filter_by(role=3).all()
+                    else:
+                        employees = User.query.filter_by(role=4).all()
+                    for employee in employees:
+                        listOfEmployees.append(employee.employeeName)
+                        optionList = optionList + "<option value='{0}'>{1}</option>".format(employee.id,employee.employeeName)
+                    if roles[shift.role] == "MA":
+                        for employee in extraEmployees:
+                            listOfEmployees.append(employee.employeeName)
+                            optionList = optionList + "<option value='{0}'>{1}</option>".format(employee.id,employee.employeeName)
+                    if shift.day == day:
+                        if employeeName == "None":
+                            valueFiller = ""
+                        else:
+                            valueFiller = "value='{0}'".format(employeeName)
+                        tableRows = tableRows + "<tr><td>" + roles[shift.role] + "</td><td>" + "<select name='{1}'{2}>{0}</select>".format(optionList,shift.id, valueFiller) + "</td><td>" + startTimes[shift.timeIn - 8] + "</td><td>" + endTimes[shift.timeOut - 8] + "</td></tr>"
+                    
+                htmlTable += """<td valign='top'>
+                <day style='float: right'>{0}</day>
+                <table border='1px' border-collapse='collapse'>
+                <tr>
+                <th>Role</th>
+                <th>Employee</th>
+                <th>Beg</th>
+                <th>End</th>
+                </tr>{1}</table></td>
+
+                """.format(day,tableRows)
+        htmlTable += "</tr>"
+    htmlTable += "</table><label> Assign Shifts as Seen </label><input type='submit'>"
+    
+    return htmlTable
+
+@app.route("/deleteshifts", methods=['GET', 'POST'])
+def deleteshifts():
+    if request.method == 'GET':
+        year = int(request.args.get('year'))
+        month = int(request.args.get('month'))
+        shifts = Shift.query.filter_by(year=year, month=month).order_by(Shift.day.asc(),Shift.timeIn.asc()).all()
+        startTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM']
+        endTimes = ['8AM', '9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM', '7PM', '8PM', '9PM', '10PM']
+        roles = ['M', 'MA', 'A', 'C', 'R']
+        listForm = makeCalendarList(year, month)
+        monthName = datetime.date(1900, month, 1).strftime('%B')
+        htmlTable = """<form action='/delete' method='post'>
+        <input type='hidden' name='month' value='{2}'>
+        <input type='hidden' name='year' value='{1}'>:
+        <h1 align="center">{0} {1} </h1>
+        <br>
+        Delete Shifts
+        <br>
+        <table width='100%' border='1px'> 
+        <tr> 
+        <th> Sunday </th> 
+        <th> Monday </th> 
+        <th> Tuesday </th> 
+        <th> Wednesday </th> 
+        <th> Thursday </th> 
+        <th> Friday </th> 
+        <th> Saturday </th> 
+        </tr>""".format(monthName,str(year), str(month))
+        for row in listForm:
+            htmlTable += "<tr>"
+            for i in range(len(row)):
+                day = row[i]
+                if day == "":
+                    htmlTable += "<td></td>"
+                else:
+                    tableRows = ""
+                    for shift in shifts:
+                        employee = User.query.filter_by(id=shift.userId).first()
+                        if employee == None:
+                            employeeName = "None"
+                        else:
+                            employeeName = employee.employeeName
+                        
+                        if shift.day == day:
+                            if employeeName == "None":
+                                valueFiller = ""
+                            else:
+                                valueFiller = "value='{0}'".format(employeeName)
+                            tableRows = tableRows + "<tr><td>" + roles[shift.role] + "</td><td>" + employeeName + "</td><td>" + startTimes[shift.timeIn - 8] + "</td><td>" + endTimes[shift.timeOut - 8] + "</td><td><input type='checkbox' name='{0}' value='delete'></td></tr>".format(shift.id)
+                        
+                    htmlTable += """<td valign='top'>
+                    <day style='float: right'>{0}</day>
+                    <table border='1px' border-collapse='collapse'>
+                    <tr>
+                    <th>Role</th>
+                    <th>Employee</th>
+                    <th>Beg</th>
+                    <th>End</th>
+                    <th>Del</th>
+                    </tr>{1}</table></td>
+
+                    """.format(day,tableRows)
+            htmlTable += "</tr>"
+        htmlTable += "</table><label> Delete Shifts as Seen </label><input type='submit'>"
+        
+        return htmlTable
+    if request.method == 'POST':
+        year = request.form['year']
+        month = request.form['month']
+        shifts = Shift.query.filter_by(year=year,month=month).all()
+        for shift in shifts:
+            if request.form[str(shift.id)] == True:
+                db.session.delete(shift)
+                db.session.commit()
+
+
+@app.route('/delete', methods=['POST'])
+def delete():
+    year = request.form['year']
+    month = request.form['month']
+    shifts = Shift.query.filter_by(year=year,month=month).all()
+
+    for shift in shifts:
+        print("GOT TO DELETE FOR LOOP")
+        print(shift.id)
+        if request.form.get(str(shift.id)) == "delete":
+            print("GOT TO DELETE IF STATEMENT")
+            Shift.query.filter_by(id=shift.id).delete()
+            db.session.commit()  
+          
+        #return redirect("/deleteshifts?year={0}&month={1}".format(year,month))
+
+@app.route("/assignshifts", methods=['POST'])
+def assignshifts():
+    year = request.form['year']
+    month = request.form['month']
+    shifts = Shift.query.filter_by(year=year, month=month).all()
+    for shift in shifts:
+        assignedEmployee = request.form[str(shift.id)]
+        shift.assignShift(assignedEmployee)
+        db.session.commit()
+    return redirect("/viewmonth?year={0}&month={1}".format(year,month))
 if __name__ == "__main__":
     app.run()

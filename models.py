@@ -2,71 +2,15 @@ from app import db
 from hashutils import makePwHash
 import random
 
-# class User(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     username = db.Column(db.String(20), unique=True)
-#     pwHash = db.Column(db.String(120))
-#     #games = db.relationship('Games', backref='' #maybe connect with character, which has a game id column instead of games
-#     gamesPlayed = db.Column(db.Integer, default=0)
-#     score = db.Column(db.Integer, default=1000)
-
-#     def __init__(self, username, password):
-#         self.username = username
-#
-class Shift():
-    id = db.Column(db.Integer, primary_key=True)
-    day = db.Column(db.Integer)
-    month = db.Column(db.Integer)
-    year = db.Column(db.Integer)
-    role = db.Column(db.String(3))
-    timeIn = db.Column(db.String(5))
-    timeOut = db.Column(db.String(5))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-
-    def __init__(self, day, month, year, role, timeIn, timeOut):
-        self.day = day
-        self.month = month
-        self.year = year
-        self.role = role
-        self.timeIn = timeIn
-        self.timeOut = timeOut
-
-    def assignShift(self, user_id):
-        self.user_id = user_id
-
-    def checkTardy(self, clockIn):
-        clockInTime = float(clockIn.split(":")[0] + "." + str(float(clockIn.split(":")[1])/60))
-        timeInTime = float(self.timeIn.split(":")[0] + "." + str(float(self.timeIn.split(":")[1])/60))
-        difference = clockIn - self.timeIn
-        #TODO work on returning a number of minutes person was late or early
-
-class Testrequestday(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    day = db.Column(db.Integer)
-    month = db.Column(db.Integer)
-    year = db.Column(db.Integer)
-    choice = db.Column(db.String(5))
-    startTime = db.Column(db.Integer)
-    endTime = db.Column(db.Integer)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-
-    def __init__(self, choice, startTime, endTime, day, month, year, userID):
-        self.day = day
-        self.month = month
-        self.year = year
-        self.choice = choice
-        self.startTime = startTime
-        self.endTime = endTime
-        self.user_id = userID
-
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin = db.Column(db.Integer)
     username = db.Column(db.String(20), unique=True)
     pwHash = db.Column(db.String(120))
     employeeName = db.Column(db.String(50))
-    testRequestDays = db.relationship('Testrequestday', backref='user_id')
-    shifts = db.relationship('Shift', backref='user_id')
+    testRequestDays = db.relationship('Testrequestday', backref='user')
+    shifts = db.relationship('Shift', backref='user')
+    role = db.Column(db.Integer, nullable=False)
 
     def __init__(self, username, password, employeeName):
         newID = (User.query.order_by(User.id.desc()).first())
@@ -78,6 +22,55 @@ class User(db.Model):
         self.pwHash = makePwHash(password)
         self.admin = 0
         self.employeeName = employeeName
+
+class Testrequestday(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Integer)
+    month = db.Column(db.Integer)
+    year = db.Column(db.Integer)
+    choice = db.Column(db.String(5))
+    startTime = db.Column(db.Integer)
+    endTime = db.Column(db.Integer)
+    employeeId = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def __init__(self, choice, startTime, endTime, day, month, year, userID):
+        self.day = day
+        self.month = month
+        self.year = year
+        self.choice = choice
+        self.startTime = startTime
+        self.endTime = endTime
+        self.employeeId = userID
+
+class Shift(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Integer)
+    month = db.Column(db.Integer)
+    year = db.Column(db.Integer)
+    role = db.Column(db.Integer)
+    timeIn = db.Column(db.Integer)
+    timeOut = db.Column(db.Integer)
+    userId = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    def __init__(self, day, month, year, role, timeIn, timeOut):
+        self.day = day
+        self.month = month
+        self.year = year
+        self.role = role
+        self.timeIn = timeIn
+        self.timeOut = timeOut
+
+    def assignShift(self, user_id):
+        self.userId = user_id
+
+    def checkTardy(self, clockIn):
+        clockInTime = float(clockIn.split(":")[0] + "." + str(float(clockIn.split(":")[1])/60))
+        timeInTime = float(self.timeIn.split(":")[0] + "." + str(float(self.timeIn.split(":")[1])/60))
+        difference = clockIn - self.timeIn
+        #TODO work on returning a number of minutes person was late or early
+
+
+
 
 # class Request(db.Model):
 #     id = db.Column(db.Integer, primary_key=True)
